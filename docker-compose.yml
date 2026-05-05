@@ -45,6 +45,7 @@ services:
     environment:
       - ConnectionStrings__Default=Host=postgres;Database=parking;Username=parking_user;Password=parking_pass
       - ASPNETCORE_URLS=http://+:80
+      - STUCK_SECONDS=10
     depends_on:
       - postgres
       - mosquitto
