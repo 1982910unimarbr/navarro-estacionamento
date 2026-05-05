@@ -1,4 +1,4 @@
-Cotnusing Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Backend.Data;
 using System.Text.Json;
 using System;
