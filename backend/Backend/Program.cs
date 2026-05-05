@@ -2,9 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Backend.Data;
 using System.Text.Json;
 using System;
-using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Client.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,22 +16,7 @@ builder.Services.AddDbContext<ParkingContext>(opt => opt.UseNpgsql(conn));
 
 var app = builder.Build();
 
-// configure MQTT publisher client for optional recommendation publishing
-var mqttHost = Environment.GetEnvironmentVariable("MQTT_HOST") ?? "mosquitto";
-var mqttPort = int.TryParse(Environment.GetEnvironmentVariable("MQTT_PORT"), out var mp) ? mp : 1883;
-IMqttClient? mqttClient = null;
-try
-{
-    var factory = new MqttFactory();
-    mqttClient = factory.CreateMqttClient();
-    var opts = new MqttClientOptionsBuilder().WithTcpServer(mqttHost, mqttPort).Build();
-    // connect asynchronously but don't block startup too long
-    _ = mqttClient.ConnectAsync(opts, CancellationToken.None);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"MQTT client init failed: {ex.Message}");
-}
+
 
 if (app.Environment.IsDevelopment())
 {
@@ -235,21 +217,6 @@ app.MapGet("/api/v1/recommendation", async (ParkingContext db, string fromSector
     var rec = new Backend.Models.RecommendationLog { Id = Guid.NewGuid(), Ts = DateTime.UtcNow, FromSector = fromSector, RecommendedSector = candidate.sectorId, Reason = reason, DataJson = System.Text.Json.JsonSerializer.Serialize(new { from = from, candidate = candidate }) };
     db.Recommendations.Add(rec);
     await db.SaveChangesAsync();
-
-    // optionally publish recommendation via MQTT
-    try
-    {
-        if (mqttClient != null && mqttClient.IsConnected)
-        {
-            var payload = System.Text.Json.JsonSerializer.Serialize(new { fromSector, recommendedSector = candidate.sectorId, reason, ts = rec.Ts });
-            var message = new MqttApplicationMessageBuilder().WithTopic("campus/parking/recommendations").WithPayload(payload).WithAtLeastOnceQoS().Build();
-            await mqttClient.PublishAsync(message);
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Failed to publish recommendation via MQTT: {ex.Message}");
-    }
 
     return Results.Ok(new { fromSector, recommendedSector = candidate.sectorId, reason, ts = rec.Ts });
 });
