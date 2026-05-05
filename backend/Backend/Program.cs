@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Backend.Data;
-using Backend.Services;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,15 +13,81 @@ var conn = builder.Configuration.GetConnectionString("Default") ?? Environment.G
 
 builder.Services.AddDbContext<ParkingContext>(opt => opt.UseNpgsql(conn));
 
-// MQTT subscriber background service
-builder.Services.AddHostedService<MqttSubscriber>();
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// internal endpoint: ingest events forwarded by MQTT bridge
+app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req) =>
+{
+    using var doc = await JsonDocument.ParseAsync(req.Body);
+    if (!doc.RootElement.TryGetProperty("eventId", out var evId)) return Results.BadRequest();
+    var eventId = evId.GetString();
+    if (string.IsNullOrEmpty(eventId)) return Results.BadRequest();
+    var exists = await db.SpotEvents.FindAsync(new object[] { eventId });
+    if (exists != null) return Results.Ok(new { ok = true, duplicate = true });
+
+    var state = doc.RootElement.GetProperty("state").GetString();
+    var sectorId = doc.RootElement.GetProperty("sectorId").GetString();
+    var spotId = doc.RootElement.GetProperty("spotId").GetString();
+    var ts = doc.RootElement.GetProperty("ts").GetDateTime();
+
+    var se = new Backend.Models.SpotEvent { EventId = eventId, Ts = ts, SectorId = sectorId, SpotId = spotId, State = state, RawPayloadJson = doc.RootElement.GetRawText() };
+    db.SpotEvents.Add(se);
+
+    var spot = await db.Spots.FindAsync(spotId);
+    if (spot == null)
+    {
+        spot = new Backend.Models.Spot { SpotId = spotId, SectorId = sectorId, CurrentState = state, LastChangeTs = ts, LastEventId = eventId };
+        db.Spots.Add(spot);
+    }
+    else
+    {
+        spot.CurrentState = state;
+        spot.LastChangeTs = ts;
+        spot.LastEventId = eventId;
+        db.Spots.Update(spot);
+    }
+
+    // basic incident detection
+    // FLAPPING: many events for same spot within short window
+    var flappingWindowSec = 30; // seconds
+    var flappingThreshold = 4; // events
+    var windowStart = ts.AddSeconds(-flappingWindowSec);
+    var recentCount = await db.SpotEvents.Where(e => e.SpotId == spotId && e.Ts >= windowStart).CountAsync();
+    if (recentCount >= flappingThreshold)
+    {
+        var existsInc = await db.Incidents.Where(i => i.SpotId == spotId && i.Type == "FLAPPING" && i.Status == "open").FirstOrDefaultAsync();
+        if (existsInc == null)
+        {
+            var inc = new Backend.Models.Incident { TsOpen = DateTime.UtcNow, Type = "FLAPPING", Severity = 2, SectorId = sectorId, SpotId = spotId, EvidenceJson = JsonSerializer.Serialize(new { recentCount, windowSec = flappingWindowSec }), Status = "open" };
+            db.Incidents.Add(inc);
+        }
+    }
+
+    // STUCK detection: if spot has not changed for a long time compared to threshold
+    var stuckThresholdSec = int.TryParse(Environment.GetEnvironmentVariable("STUCK_SECONDS"), out var st) ? st : 3600; // default 1h
+    if (spot.LastChangeTs != null)
+    {
+        var age = DateTime.UtcNow - spot.LastChangeTs.Value.ToUniversalTime();
+        if (age.TotalSeconds >= stuckThresholdSec)
+        {
+            var type = spot.CurrentState == "OCCUPIED" ? "STUCK_OCCUPIED" : "STUCK_FREE";
+            var existsInc = await db.Incidents.Where(i => i.SpotId == spotId && i.Type == type && i.Status == "open").FirstOrDefaultAsync();
+            if (existsInc == null)
+            {
+                var inc = new Backend.Models.Incident { TsOpen = DateTime.UtcNow, Type = type, Severity = 3, SectorId = sectorId, SpotId = spotId, EvidenceJson = JsonSerializer.Serialize(new { lastChange = spot.LastChangeTs, now = DateTime.UtcNow }), Status = "open" };
+                db.Incidents.Add(inc);
+            }
+        }
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new { ok = true });
+});
 
 app.MapGet("/api/v1/map", async (ParkingContext db) =>
 {
