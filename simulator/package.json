@@ -1,0 +1,15 @@
+{
+  "name": "parking-simulator",
+  "version": "0.1.0",
+  "description": "MQTT-based parking lot simulator",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "async-mutex": "^0.3.2",
+    "express": "^4.18.2",
+    "mqtt": "^4.3.7",
+    "uuid": "^9.0.0"
+  }
+}

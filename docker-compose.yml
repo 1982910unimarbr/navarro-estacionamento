@@ -1,0 +1,46 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: parking
+      POSTGRES_USER: parking_user
+      POSTGRES_PASSWORD: parking_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  simulator:
+    build: ./simulator
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - SIM_TIME_RATIO=60 # 1s = 60 simulated seconds (configurable)
+    depends_on:
+      - mosquitto
+    ports:
+      - "3000:3000" # HTTP control
+
+  backend:
+    build: ./backend
+    environment:
+      - ConnectionStrings__Default=Host=postgres;Database=parking;Username=parking_user;Password=parking_pass
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    depends_on:
+      - postgres
+      - mosquitto
+    ports:
+      - "5000:80"
+
+volumes:
+  pgdata:
