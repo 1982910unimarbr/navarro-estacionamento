@@ -15,5 +15,5 @@ FROM build AS final
 WORKDIR /app
 # remove any existing publish dir and copy published files into /app root
 RUN rm -rf /app/publish || true
-COPY --from=build /src/Backend/bin/Release/net10.0/publish/* .
+COPY --from=build /app/publish/* .
 ENTRYPOINT ["dotnet","Backend.dll"]
