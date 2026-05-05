@@ -196,11 +196,32 @@ app.MapGet("/api/v1/recommendation", async (ParkingContext db, string fromSector
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ParkingContext>();
-    // create database schema if missing
-    db.Database.EnsureCreated();
+    // create database schema if missing with retry loop for DB readiness
+    var attempts = 0;
+    var maxAttempts = 20;
+    var created = false;
+    while (!created && attempts < maxAttempts)
+    {
+        try
+        {
+            db.Database.EnsureCreated();
+            created = true;
+        }
+        catch (Exception ex)
+        {
+            attempts++;
+            Console.WriteLine($"Database not ready (attempt {attempts}): {ex.Message}");
+            System.Threading.Thread.Sleep(2000);
+        }
+    }
+
+    if (!created)
+    {
+        Console.WriteLine("Failed to initialize database after retries.");
+    }
 
     // seed spots if empty
-    if (!db.Spots.Any())
+    if (created && !db.Spots.Any())
     {
         var sectors = new[] { "A", "B", "C" };
         foreach (var s in sectors)
