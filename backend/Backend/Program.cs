@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+Cotnusing Microsoft.EntityFrameworkCore;
 using Backend.Data;
 using System.Text.Json;
 using System;
@@ -191,5 +191,28 @@ app.MapGet("/api/v1/recommendation", async (ParkingContext db, string fromSector
     await db.SaveChangesAsync();
     return Results.Ok(new { fromSector, recommendedSector = candidate.sectorId, reason, ts = rec.Ts });
 });
+
+// ensure database exists and seed initial spots for sectors A,B,C
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ParkingContext>();
+    // create database schema if missing
+    db.Database.EnsureCreated();
+
+    // seed spots if empty
+    if (!db.Spots.Any())
+    {
+        var sectors = new[] { "A", "B", "C" };
+        foreach (var s in sectors)
+        {
+            for (int i = 1; i <= 30; i++)
+            {
+                var id = $"{s}-{i.ToString().PadLeft(2, '0')}";
+                db.Spots.Add(new Backend.Models.Spot { SpotId = id, SectorId = s, CurrentState = "FREE", LastChangeTs = DateTime.UtcNow, LastEventId = null });
+            }
+        }
+        db.SaveChanges();
+    }
+}
 
 app.Run();
