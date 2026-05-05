@@ -30,12 +30,21 @@ services:
     ports:
       - "3000:3000" # HTTP control
 
+  bridge:
+    build: ./bridge
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - BACKEND_URL=http://backend
+    depends_on:
+      - mosquitto
+      - backend
+
   backend:
     build: ./backend
     environment:
       - ConnectionStrings__Default=Host=postgres;Database=parking;Username=parking_user;Password=parking_pass
-      - MQTT_HOST=mosquitto
-      - MQTT_PORT=1883
+      - ASPNETCORE_URLS=http://+:80
     depends_on:
       - postgres
       - mosquitto
