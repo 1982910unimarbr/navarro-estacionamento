@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Backend.Data;
 using System.Text.Json;
 using System;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Client.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +18,23 @@ var conn = builder.Configuration.GetConnectionString("Default") ?? Environment.G
 builder.Services.AddDbContext<ParkingContext>(opt => opt.UseNpgsql(conn));
 
 var app = builder.Build();
+
+// configure MQTT publisher client for optional recommendation publishing
+var mqttHost = Environment.GetEnvironmentVariable("MQTT_HOST") ?? "mosquitto";
+var mqttPort = int.TryParse(Environment.GetEnvironmentVariable("MQTT_PORT"), out var mp) ? mp : 1883;
+IMqttClient? mqttClient = null;
+try
+{
+    var factory = new MqttFactory();
+    mqttClient = factory.CreateMqttClient();
+    var opts = new MqttClientOptionsBuilder().WithTcpServer(mqttHost, mqttPort).Build();
+    // connect asynchronously but don't block startup too long
+    _ = mqttClient.ConnectAsync(opts, CancellationToken.None);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"MQTT client init failed: {ex.Message}");
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -118,6 +138,32 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
     return Results.Ok(new { ok = true });
 });
 
+// accept gateway status messages (from bridge) as fallback when eventId is not present
+app.MapPost("/api/v1/internal/gateway-status", async (ParkingContext db, HttpRequest req) =>
+{
+    using var doc = await JsonDocument.ParseAsync(req.Body);
+    if (!doc.RootElement.TryGetProperty("sectorId", out var sectorIdElem)) return Results.BadRequest();
+    var sectorId = sectorIdElem.GetString();
+    var status = doc.RootElement.TryGetProperty("status", out var st) ? st.GetString() : null;
+    var ts = doc.RootElement.TryGetProperty("ts", out var tsel) ? tsel.GetDateTime() : DateTime.UtcNow;
+
+    var gs = await db.GatewayStatuses.FindAsync(sectorId);
+    if (gs == null)
+    {
+        gs = new Backend.Models.GatewayStatus { SectorId = sectorId, Status = status, LastSeen = ts };
+        db.GatewayStatuses.Add(gs);
+    }
+    else
+    {
+        gs.Status = status;
+        gs.LastSeen = ts;
+        db.GatewayStatuses.Update(gs);
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(new { ok = true });
+});
+
+
 app.MapGet("/api/v1/map", async (ParkingContext db) =>
 {
     var spots = await db.Spots.ToListAsync();
@@ -189,6 +235,22 @@ app.MapGet("/api/v1/recommendation", async (ParkingContext db, string fromSector
     var rec = new Backend.Models.RecommendationLog { Id = Guid.NewGuid(), Ts = DateTime.UtcNow, FromSector = fromSector, RecommendedSector = candidate.sectorId, Reason = reason, DataJson = System.Text.Json.JsonSerializer.Serialize(new { from = from, candidate = candidate }) };
     db.Recommendations.Add(rec);
     await db.SaveChangesAsync();
+
+    // optionally publish recommendation via MQTT
+    try
+    {
+        if (mqttClient != null && mqttClient.IsConnected)
+        {
+            var payload = System.Text.Json.JsonSerializer.Serialize(new { fromSector, recommendedSector = candidate.sectorId, reason, ts = rec.Ts });
+            var message = new MqttApplicationMessageBuilder().WithTopic("campus/parking/recommendations").WithPayload(payload).WithAtLeastOnceQoS().Build();
+            await mqttClient.PublishAsync(message);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to publish recommendation via MQTT: {ex.Message}");
+    }
+
     return Results.Ok(new { fromSector, recommendedSector = candidate.sectorId, reason, ts = rec.Ts });
 });
 

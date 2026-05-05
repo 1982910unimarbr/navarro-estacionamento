@@ -12,6 +12,7 @@ namespace Backend.Data
         public DbSet<SectorSnapshot> SectorSnapshots { get; set; }
         public DbSet<Incident> Incidents { get; set; }
         public DbSet<RecommendationLog> Recommendations { get; set; }
+        public DbSet<GatewayStatus> GatewayStatuses { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +22,7 @@ namespace Backend.Data
             modelBuilder.Entity<RecommendationLog>().HasKey(r => r.Id);
             // prevent duplicate open incidents for same spot/type
             modelBuilder.Entity<Incident>().HasIndex(i => new { i.SpotId, i.Type, i.Status }).IsUnique(true);
+            modelBuilder.Entity<GatewayStatus>().HasKey(g => g.SectorId);
         }
     }
 }
