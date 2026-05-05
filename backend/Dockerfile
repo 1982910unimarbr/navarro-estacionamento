@@ -13,7 +13,7 @@ RUN dotnet publish -c Release -o /app/publish || true
 
 FROM build AS final
 WORKDIR /app
-# copy published output from build stage. Use bin/*/publish path to be robust across SDK versions
-# copy published files into /app (copy contents of publish directory)
-COPY --from=build /src/Backend/bin/Release/net*/publish/. .
+# remove any existing publish dir and copy published files into /app root
+RUN rm -rf /app/publish || true
+COPY --from=build /src/Backend/bin/Release/net10.0/publish/* .
 ENTRYPOINT ["dotnet","Backend.dll"]
