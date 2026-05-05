@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Backend.Data;
 using System.Text.Json;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,13 +42,20 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
     var spot = await db.Spots.FindAsync(spotId);
     if (spot == null)
     {
+        // new spot: initialize lastChangeTs since this is the first known state
         spot = new Backend.Models.Spot { SpotId = spotId, SectorId = sectorId, CurrentState = state, LastChangeTs = ts, LastEventId = eventId };
         db.Spots.Add(spot);
     }
     else
     {
-        spot.CurrentState = state;
-        spot.LastChangeTs = ts;
+        var prevState = spot.CurrentState;
+        // Only update LastChangeTs when the state actually changes (track transitions)
+        if (prevState != state)
+        {
+            spot.CurrentState = state;
+            spot.LastChangeTs = ts;
+        }
+        // always update last event id
         spot.LastEventId = eventId;
         db.Spots.Update(spot);
     }
@@ -58,6 +66,7 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
     var flappingThreshold = 4; // events
     var windowStart = ts.AddSeconds(-flappingWindowSec);
     var recentCount = await db.SpotEvents.Where(e => e.SpotId == spotId && e.Ts >= windowStart).CountAsync();
+    recentCount += 1; // include current event
     if (recentCount >= flappingThreshold)
     {
         var existsInc = await db.Incidents.Where(i => i.SpotId == spotId && i.Type == "FLAPPING" && i.Status == "open").FirstOrDefaultAsync();
@@ -83,6 +92,26 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
                 db.Incidents.Add(inc);
             }
         }
+    }
+
+    // create/update sector snapshot (per-minute)
+    var minuteTs = DateTime.UtcNow;
+    minuteTs = new DateTime(minuteTs.Year, minuteTs.Month, minuteTs.Day, minuteTs.Hour, minuteTs.Minute, 0, DateTimeKind.Utc);
+    var occupiedCount = await db.Spots.Where(s => s.SectorId == sectorId && s.CurrentState == "OCCUPIED").CountAsync();
+    var total = await db.Spots.Where(s => s.SectorId == sectorId).CountAsync();
+    var freeCount = total - occupiedCount;
+    var occupancyRate = total > 0 ? (decimal)occupiedCount / (decimal)total : 0;
+    var existingSnapshot = await db.SectorSnapshots.Where(s => s.SectorId == sectorId && s.Ts == minuteTs).FirstOrDefaultAsync();
+    if (existingSnapshot == null)
+    {
+        db.SectorSnapshots.Add(new Backend.Models.SectorSnapshot { Ts = minuteTs, SectorId = sectorId, OccupiedCount = occupiedCount, FreeCount = freeCount, OccupancyRate = occupancyRate });
+    }
+    else
+    {
+        existingSnapshot.OccupiedCount = occupiedCount;
+        existingSnapshot.FreeCount = freeCount;
+        existingSnapshot.OccupancyRate = occupancyRate;
+        db.SectorSnapshots.Update(existingSnapshot);
     }
 
     await db.SaveChangesAsync();
