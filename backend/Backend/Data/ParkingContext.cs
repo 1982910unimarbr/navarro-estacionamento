@@ -17,6 +17,8 @@ namespace Backend.Data
         {
             modelBuilder.Entity<Spot>().HasKey(s => s.SpotId);
             modelBuilder.Entity<SpotEvent>().HasKey(e => e.EventId);
+            modelBuilder.Entity<SectorSnapshot>().HasKey(s => new { s.Ts, s.SectorId });
+            modelBuilder.Entity<RecommendationLog>().HasKey(r => r.Id);
         }
     }
 }

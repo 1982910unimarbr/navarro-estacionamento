@@ -186,7 +186,7 @@ app.MapGet("/api/v1/recommendation", async (ParkingContext db, string fromSector
     var candidate = stats.Where(s=>s.sectorId!=fromSector).OrderByDescending(s=>s.freeCount).FirstOrDefault();
     if(candidate==null) return Results.NotFound();
     var reason = $"Sector {fromSector} at {Math.Round(occRate*100)}% occupancy; Sector {candidate.sectorId} has {candidate.freeCount} free spots";
-    var rec = new Backend.Models.RecommendationLog { Ts = DateTime.UtcNow, FromSector = fromSector, RecommendedSector = candidate.sectorId, Reason = reason };
+    var rec = new Backend.Models.RecommendationLog { Id = Guid.NewGuid(), Ts = DateTime.UtcNow, FromSector = fromSector, RecommendedSector = candidate.sectorId, Reason = reason, DataJson = System.Text.Json.JsonSerializer.Serialize(new { from = from, candidate = candidate }) };
     db.Recommendations.Add(rec);
     await db.SaveChangesAsync();
     return Results.Ok(new { fromSector, recommendedSector = candidate.sectorId, reason, ts = rec.Ts });
