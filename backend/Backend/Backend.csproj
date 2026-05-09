@@ -15,6 +15,7 @@
     </PackageReference>
     <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.14.11" />
   </ItemGroup>
 
 </Project>

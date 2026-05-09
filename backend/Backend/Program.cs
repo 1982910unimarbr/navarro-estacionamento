@@ -3,6 +3,7 @@ using Backend.Data;
 using Backend.Services;
 using System.Text.Json;
 using System;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,10 +21,8 @@ var app = builder.Build();
 
 
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 // internal endpoint: ingest events forwarded by MQTT bridge
 app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req) =>
@@ -165,7 +164,8 @@ app.MapPost("/api/v1/internal/gateway-status", async (ParkingContext db, HttpReq
 app.MapGet("/api/v1/map", async (ParkingContext db) =>
 {
     var spots = await db.Spots.ToListAsync();
-    var sectors = spots.GroupBy(s => s.SectorId).Select(g => new {
+    var sectors = spots.GroupBy(s => s.SectorId).Select(g => new
+    {
         sectorId = g.Key,
         spots = g.Select(s => new { s.SpotId, s.CurrentState, s.LastChangeTs })
     });
@@ -175,7 +175,8 @@ app.MapGet("/api/v1/map", async (ParkingContext db) =>
 app.MapGet("/api/v1/sectors", async (ParkingContext db) =>
 {
     var sectors = await db.Spots.GroupBy(s => s.SectorId)
-        .Select(g => new {
+        .Select(g => new
+        {
             sectorId = g.Key,
             occupiedCount = g.Count(s => s.CurrentState == "OCCUPIED"),
             freeCount = g.Count(s => s.CurrentState == "FREE"),
@@ -201,9 +202,9 @@ app.MapGet("/api/v1/reports/turnover", async (ParkingContext db, string? sectorI
 {
     // turnover = number of FREE->OCCUPIED transitions in period
     var q = db.SpotEvents.AsQueryable();
-    if(sectorId!=null) q = q.Where(e => e.SectorId == sectorId);
-    if(from!=null) q = q.Where(e => e.Ts >= from);
-    if(to!=null) q = q.Where(e => e.Ts <= to);
+    if (sectorId != null) q = q.Where(e => e.SectorId == sectorId);
+    if (from != null) q = q.Where(e => e.Ts >= from);
+    if (to != null) q = q.Where(e => e.Ts <= to);
     var count = await q.Where(e => e.State == "OCCUPIED").CountAsync();
     return Results.Ok(new { turnover = count });
 });
@@ -211,7 +212,7 @@ app.MapGet("/api/v1/reports/turnover", async (ParkingContext db, string? sectorI
 app.MapGet("/api/v1/incidents", async (ParkingContext db, string? status) =>
 {
     var q = db.Incidents.AsQueryable();
-    if(status!=null) q = q.Where(i => i.Status == status);
+    if (status != null) q = q.Where(i => i.Status == status);
     var list = await q.ToListAsync();
     return Results.Ok(list);
 });
@@ -219,18 +220,19 @@ app.MapGet("/api/v1/incidents", async (ParkingContext db, string? status) =>
 app.MapGet("/api/v1/recommendation", async (ParkingContext db, string fromSector) =>
 {
     // If sector occupancy >= 0.9 recommend another sector with most free spots
-    var stats = await db.Spots.GroupBy(s => s.SectorId).Select(g => new {
+    var stats = await db.Spots.GroupBy(s => s.SectorId).Select(g => new
+    {
         sectorId = g.Key,
         freeCount = g.Count(s => s.CurrentState == "FREE"),
         total = g.Count()
     }).ToListAsync();
     var from = stats.FirstOrDefault(s => s.sectorId == fromSector);
-    if(from == null) return Results.NotFound();
+    if (from == null) return Results.NotFound();
     var occRate = 1.0 - ((double)from.freeCount / from.total);
-    if(occRate < 0.9) return Results.Ok(new { message = "fromSector not over threshold", occupancyRate = occRate });
-    var candidate = stats.Where(s=>s.sectorId!=fromSector).OrderByDescending(s=>s.freeCount).FirstOrDefault();
-    if(candidate==null) return Results.NotFound();
-    var reason = $"Sector {fromSector} at {Math.Round(occRate*100)}% occupancy; Sector {candidate.sectorId} has {candidate.freeCount} free spots";
+    if (occRate < 0.9) return Results.Ok(new { message = "fromSector not over threshold", occupancyRate = occRate });
+    var candidate = stats.Where(s => s.sectorId != fromSector).OrderByDescending(s => s.freeCount).FirstOrDefault();
+    if (candidate == null) return Results.NotFound();
+    var reason = $"Sector {fromSector} at {Math.Round(occRate * 100)}% occupancy; Sector {candidate.sectorId} has {candidate.freeCount} free spots";
     var rec = new Backend.Models.RecommendationLog { Id = Guid.NewGuid(), Ts = DateTime.UtcNow, FromSector = fromSector, RecommendedSector = candidate.sectorId, Reason = reason, DataJson = System.Text.Json.JsonSerializer.Serialize(new { from = from, candidate = candidate }) };
     db.Recommendations.Add(rec);
     await db.SaveChangesAsync();
