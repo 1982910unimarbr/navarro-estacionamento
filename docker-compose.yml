@@ -1,5 +1,13 @@
 version: '3.8'
 services:
+  pgadmin4:
+      image: elestio/pgadmin
+      environment:
+        PGADMIN_DEFAULT_EMAIL: leandropoletti@outlook.com
+        PGADMIN_DEFAULT_PASSWORD: Senha123
+        PGADMIN_LISTEN_PORT: 8080
+      ports:
+      - "8080:8080"
   postgres:
     image: postgres:15
     environment:

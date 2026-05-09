@@ -16,6 +16,10 @@ client.on('connect', ()=>{
 client.on('message', async (topic, payload)=>{
   try{
     const body = payload.toString();
+    if (topic.endsWith('/gateway/status')) {
+      await axios.post(`${BACKEND_URL}/api/v1/internal/gateway-status`, body, { headers: { 'Content-Type':'application/json' } });
+      return;
+    }
     // forward to backend ingest endpoint
     await axios.post(`${BACKEND_URL}/api/v1/internal/events`, body, { headers: { 'Content-Type':'application/json' } });
   }catch(err){

@@ -1,0 +1,205 @@
+{
+  "startedAt": "2026-05-09T19:03:20.3456909Z",
+  "mqtt": {
+    "host": "localhost",
+    "port": 1883
+  },
+  "apiUrl": "http://localhost:5000",
+  "simulatorUrl": "http://localhost:3000",
+  "sector": "A",
+  "summary": {
+    "occupancyRate": 0.9333333333333333,
+    "recommendation": {
+      "fromSector": "A",
+      "recommendedSector": "C",
+      "reason": "Sector A at 93% occupancy; Sector C has 28 free spots",
+      "ts": "2026-05-09T19:03:45.095712Z"
+    },
+    "incidentsOpenCount": 18
+  },
+  "steps": [
+    {
+      "name": "sectors",
+      "data": [
+        {
+          "sectorId": "A",
+          "occupiedCount": 28,
+          "freeCount": 2,
+          "occupancyRate": 0.9333333333333333,
+          "lastUpdateTs": "2026-05-09T19:03:41.232597Z"
+        },
+        {
+          "sectorId": "C",
+          "occupiedCount": 2,
+          "freeCount": 28,
+          "occupancyRate": 0.06666666666666667,
+          "lastUpdateTs": "2026-05-09T19:03:12.419Z"
+        },
+        {
+          "sectorId": "B",
+          "occupiedCount": 2,
+          "freeCount": 28,
+          "occupancyRate": 0.06666666666666667,
+          "lastUpdateTs": "2026-05-09T19:03:38.444Z"
+        }
+      ]
+    },
+    {
+      "name": "sectors_after_fill",
+      "data": [
+        {
+          "sectorId": "A",
+          "occupiedCount": 28,
+          "freeCount": 2,
+          "occupancyRate": 0.9333333333333333,
+          "lastUpdateTs": "2026-05-09T19:03:41.232597Z"
+        },
+        {
+          "sectorId": "C",
+          "occupiedCount": 2,
+          "freeCount": 28,
+          "occupancyRate": 0.06666666666666667,
+          "lastUpdateTs": "2026-05-09T19:03:12.419Z"
+        },
+        {
+          "sectorId": "B",
+          "occupiedCount": 2,
+          "freeCount": 28,
+          "occupancyRate": 0.06666666666666667,
+          "lastUpdateTs": "2026-05-09T19:03:38.444Z"
+        }
+      ],
+      "occupancyRate": 0.9333333333333333,
+      "attempts": 0
+    },
+    {
+      "name": "recommendation",
+      "data": {
+        "fromSector": "A",
+        "recommendedSector": "C",
+        "reason": "Sector A at 93% occupancy; Sector C has 28 free spots",
+        "ts": "2026-05-09T19:03:45.095712Z"
+      }
+    },
+    {
+      "name": "inject_fault",
+      "data": {
+        "ok": true
+      }
+    },
+    {
+      "name": "incidents_open",
+      "count": 18,
+      "sample": [
+        {
+          "id": "15a0cf83-349b-4085-bb71-25bb68de418b",
+          "tsOpen": "2026-05-09T19:02:24.647721Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "A",
+          "spotId": "A-12",
+          "evidenceJson": "{\"lastChange\":\"2026-05-09T19:02:10.369Z\",\"now\":\"2026-05-09T19:02:24.6477218Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "3397cdab-0819-490b-abb0-563112cd7853",
+          "tsOpen": "2026-05-09T19:02:39.643264Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "A",
+          "spotId": "A-23",
+          "evidenceJson": "{\"lastChange\":\"2026-05-09T19:02:19.375Z\",\"now\":\"2026-05-09T19:02:39.6432641Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "4d25cd4b-d65c-4f89-a9f6-2c98ec1f4dd9",
+          "tsOpen": "2026-05-09T19:02:54.640909Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "B",
+          "spotId": "B-27",
+          "evidenceJson": "{\"lastChange\":\"2026-05-09T19:02:38.389Z\",\"now\":\"2026-05-09T19:02:54.6409099Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "fb87cf02-b2d0-4dc3-ae14-42ae26881119",
+          "tsOpen": "2026-05-09T19:03:09.63728Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "A",
+          "spotId": "A-21",
+          "evidenceJson": "{\"lastChange\":\"2026-05-09T19:02:45.395Z\",\"now\":\"2026-05-09T19:03:09.6372808Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "e7dad0d2-7748-42ae-aa2f-cca78abcde80",
+          "tsOpen": "2026-05-09T19:03:09.63728Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "C",
+          "spotId": "C-08",
+          "evidenceJson": "{\"lastChange\":\"2026-05-09T19:02:58.406Z\",\"now\":\"2026-05-09T19:03:09.6372808Z\"}",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "name": "idempotency",
+      "data": {
+        "after": [
+          {
+            "sectorId": "A",
+            "occupiedCount": 28,
+            "freeCount": 2,
+            "occupancyRate": 0.9333333333333333,
+            "lastUpdateTs": "2026-05-09T19:03:41.232597Z"
+          },
+          {
+            "sectorId": "C",
+            "occupiedCount": 2,
+            "freeCount": 28,
+            "occupancyRate": 0.06666666666666667,
+            "lastUpdateTs": "2026-05-09T19:03:12.419Z"
+          },
+          {
+            "sectorId": "B",
+            "occupiedCount": 2,
+            "freeCount": 28,
+            "occupancyRate": 0.06666666666666667,
+            "lastUpdateTs": "2026-05-09T19:03:38.444Z"
+          }
+        ],
+        "before": [
+          {
+            "sectorId": "A",
+            "occupiedCount": 28,
+            "freeCount": 2,
+            "occupancyRate": 0.9333333333333333,
+            "lastUpdateTs": "2026-05-09T19:03:41.232597Z"
+          },
+          {
+            "sectorId": "C",
+            "occupiedCount": 2,
+            "freeCount": 28,
+            "occupancyRate": 0.06666666666666667,
+            "lastUpdateTs": "2026-05-09T19:03:12.419Z"
+          },
+          {
+            "sectorId": "B",
+            "occupiedCount": 2,
+            "freeCount": 28,
+            "occupancyRate": 0.06666666666666667,
+            "lastUpdateTs": "2026-05-09T19:03:38.444Z"
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [],
+  "completedAt": "2026-05-09T19:03:46.4870725Z"
+}

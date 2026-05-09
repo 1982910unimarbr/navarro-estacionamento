@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Backend.Data;
+using Backend.Services;
 using System.Text.Json;
 using System;
 
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // use minimal built-in OpenAPI helper
 builder.Services.AddOpenApi();
+builder.Services.AddHostedService<IncidentMonitor>();
 
 var conn = builder.Configuration.GetConnectionString("Default") ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default") ?? "Host=postgres;Database=parking;Username=parking_user;Password=parking_pass";
 
@@ -56,6 +58,19 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
         {
             spot.CurrentState = state;
             spot.LastChangeTs = ts;
+
+            var openIncidents = await db.Incidents
+                .Where(i => i.SpotId == spotId && i.Status == "open")
+                .ToListAsync();
+            foreach (var inc in openIncidents)
+            {
+                if (inc.Type == "STUCK_OCCUPIED" || inc.Type == "STUCK_FREE" || inc.Type == "FLAPPING")
+                {
+                    inc.Status = "closed";
+                    inc.TsClose = DateTime.UtcNow;
+                    db.Incidents.Update(inc);
+                }
+            }
         }
         // always update last event id
         spot.LastEventId = eventId;
@@ -74,14 +89,14 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
         var existsInc = await db.Incidents.Where(i => i.SpotId == spotId && i.Type == "FLAPPING" && i.Status == "open").FirstOrDefaultAsync();
         if (existsInc == null)
         {
-            var inc = new Backend.Models.Incident { TsOpen = DateTime.UtcNow, Type = "FLAPPING", Severity = 2, SectorId = sectorId, SpotId = spotId, EvidenceJson = JsonSerializer.Serialize(new { recentCount, windowSec = flappingWindowSec }), Status = "open" };
-            db.Incidents.Add(inc);
+            var inc = new Backend.Models.Incident { Id = Guid.NewGuid(), TsOpen = DateTime.UtcNow, Type = "FLAPPING", Severity = 2, SectorId = sectorId, SpotId = spotId, EvidenceJson = JsonSerializer.Serialize(new { recentCount, windowSec = flappingWindowSec }), Status = "open" };
+            await IncidentWriter.AddIfNotExistsAsync(db, inc);
         }
     }
 
     // STUCK detection: if spot has not changed for a long time compared to threshold
     var stuckThresholdSec = int.TryParse(Environment.GetEnvironmentVariable("STUCK_SECONDS"), out var st) ? st : 3600; // default 1h
-    if (spot.LastChangeTs != null)
+    if (spot.LastChangeTs != null && spot.LastEventId != null)
     {
         var age = DateTime.UtcNow - spot.LastChangeTs.Value.ToUniversalTime();
         if (age.TotalSeconds >= stuckThresholdSec)
@@ -90,8 +105,8 @@ app.MapPost("/api/v1/internal/events", async (ParkingContext db, HttpRequest req
             var existsInc = await db.Incidents.Where(i => i.SpotId == spotId && i.Type == type && i.Status == "open").FirstOrDefaultAsync();
             if (existsInc == null)
             {
-                var inc = new Backend.Models.Incident { TsOpen = DateTime.UtcNow, Type = type, Severity = 3, SectorId = sectorId, SpotId = spotId, EvidenceJson = JsonSerializer.Serialize(new { lastChange = spot.LastChangeTs, now = DateTime.UtcNow }), Status = "open" };
-                db.Incidents.Add(inc);
+                var inc = new Backend.Models.Incident { Id = Guid.NewGuid(), TsOpen = DateTime.UtcNow, Type = type, Severity = 3, SectorId = sectorId, SpotId = spotId, EvidenceJson = JsonSerializer.Serialize(new { lastChange = spot.LastChangeTs, now = DateTime.UtcNow }), Status = "open" };
+                await IncidentWriter.AddIfNotExistsAsync(db, inc);
             }
         }
     }
@@ -126,6 +141,7 @@ app.MapPost("/api/v1/internal/gateway-status", async (ParkingContext db, HttpReq
     using var doc = await JsonDocument.ParseAsync(req.Body);
     if (!doc.RootElement.TryGetProperty("sectorId", out var sectorIdElem)) return Results.BadRequest();
     var sectorId = sectorIdElem.GetString();
+    if (string.IsNullOrWhiteSpace(sectorId)) return Results.BadRequest();
     var status = doc.RootElement.TryGetProperty("status", out var st) ? st.GetString() : null;
     var ts = doc.RootElement.TryGetProperty("ts", out var tsel) ? tsel.GetDateTime() : DateTime.UtcNow;
 
@@ -163,7 +179,8 @@ app.MapGet("/api/v1/sectors", async (ParkingContext db) =>
             sectorId = g.Key,
             occupiedCount = g.Count(s => s.CurrentState == "OCCUPIED"),
             freeCount = g.Count(s => s.CurrentState == "FREE"),
-            occupancyRate = 1.0 * g.Count(s => s.CurrentState == "OCCUPIED") / g.Count()
+            occupancyRate = g.Count() > 0 ? 1.0 * g.Count(s => s.CurrentState == "OCCUPIED") / g.Count() : 0,
+            lastUpdateTs = g.Max(s => s.LastChangeTs)
         }).ToListAsync();
     return Results.Ok(sectors);
 });

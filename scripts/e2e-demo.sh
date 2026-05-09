@@ -12,7 +12,7 @@ set -euo pipefail
 
 MQTT_HOST="${MQTT_HOST:-localhost}"
 MQTT_PORT="${MQTT_PORT:-1883}"
-API_URL="${API_URL:-http://localhost:3000}"
+API_URL="${API_URL:-http://localhost:5000}"
 TIME_WAIT="${TIME_WAIT:-3}"
 SECTOR="A"
 

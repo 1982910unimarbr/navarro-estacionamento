@@ -117,9 +117,7 @@ app.get('/spots', (req,res)=>{
   res.json(Object.values(spots));
 });
 
-app.post('/faults', async (req,res)=>{
-  // {spotId, mode: 'stuck_occupied'|'stuck_free'|'flapping'|'clear'}
-  const {spotId, mode} = req.body;
+async function applyFaultMode(spotId, mode, res){
   if(!spots[spotId]) return res.status(404).json({error:'unknown spot'});
   const release = await mutex.acquire();
   try{
@@ -138,6 +136,26 @@ app.post('/faults', async (req,res)=>{
     }
     return res.status(400).json({error:'invalid mode'});
   }finally{release();}
+}
+
+// Backward-compatible endpoint
+app.post('/faults', async (req,res)=>{
+  // {spotId, mode: 'stuck_occupied'|'stuck_free'|'flapping'|'clear'}
+  const {spotId, mode} = req.body;
+  return applyFaultMode(spotId, mode, res);
+});
+
+// Spec-aligned endpoints
+app.post('/simulator/failures', async (req,res)=>{
+  // {spotId, mode: 'stuck_occupied'|'stuck_free'|'flapping'}
+  const {spotId, mode} = req.body;
+  return applyFaultMode(spotId, mode, res);
+});
+
+app.post('/simulator/reset', async (req,res)=>{
+  // {spotId}
+  const {spotId} = req.body;
+  return applyFaultMode(spotId, 'clear', res);
 });
 
 const port = process.env.PORT || 3000;
