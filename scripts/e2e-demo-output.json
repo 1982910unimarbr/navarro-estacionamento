@@ -1,0 +1,209 @@
+{
+  "startedAt": "2026-05-10T22:52:50.2801047Z",
+  "mqtt": {
+    "port": 1883,
+    "host": "localhost"
+  },
+  "apiUrl": "http://localhost:5000",
+  "simulatorUrl": "http://localhost:3000",
+  "sector": "A",
+  "summary": {
+    "occupancyRate": 0.9333333333333333,
+    "recommendation": {
+      "fromSector": "A",
+      "recommendedSector": "C",
+      "reason": "Sector A at 93% occupancy; Sector C has 30 free spots",
+      "ts": "2026-05-10T22:53:21.4645772Z",
+      "message": null,
+      "occupancyRate": null
+    },
+    "incidentsOpenCount": 32
+  },
+  "steps": [
+    {
+      "name": "sectors",
+      "data": [
+        {
+          "sectorId": "A",
+          "occupiedCount": 28,
+          "freeCount": 2,
+          "occupancyRate": 0.9333333333333333,
+          "lastUpdateTs": "2026-05-10T22:53:10.561032Z"
+        },
+        {
+          "sectorId": "C",
+          "occupiedCount": 0,
+          "freeCount": 30,
+          "occupancyRate": 0,
+          "lastUpdateTs": "2026-05-10T22:52:05.381Z"
+        },
+        {
+          "sectorId": "B",
+          "occupiedCount": 5,
+          "freeCount": 25,
+          "occupancyRate": 0.16666666666666666,
+          "lastUpdateTs": "2026-05-10T22:53:17.446Z"
+        }
+      ]
+    },
+    {
+      "name": "sectors_after_fill",
+      "data": [
+        {
+          "sectorId": "A",
+          "occupiedCount": 28,
+          "freeCount": 2,
+          "occupancyRate": 0.9333333333333333,
+          "lastUpdateTs": "2026-05-10T22:53:10.561032Z"
+        },
+        {
+          "sectorId": "C",
+          "occupiedCount": 0,
+          "freeCount": 30,
+          "occupancyRate": 0,
+          "lastUpdateTs": "2026-05-10T22:52:05.381Z"
+        },
+        {
+          "sectorId": "B",
+          "occupiedCount": 5,
+          "freeCount": 25,
+          "occupancyRate": 0.16666666666666666,
+          "lastUpdateTs": "2026-05-10T22:53:17.446Z"
+        }
+      ],
+      "occupancyRate": 0.9333333333333333,
+      "attempts": 0
+    },
+    {
+      "name": "recommendation",
+      "data": {
+        "fromSector": "A",
+        "recommendedSector": "C",
+        "reason": "Sector A at 93% occupancy; Sector C has 30 free spots",
+        "ts": "2026-05-10T22:53:21.4645772Z",
+        "message": null,
+        "occupancyRate": null
+      }
+    },
+    {
+      "name": "inject_fault",
+      "data": {
+        "ok": true
+      }
+    },
+    {
+      "name": "incidents_open",
+      "count": 32,
+      "sample": [
+        {
+          "id": "3887d224-ebc5-47ca-b0ca-9db1e065418c",
+          "tsOpen": "2026-05-10T22:51:35.241122Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "B",
+          "spotId": "B-08",
+          "evidenceJson": "{\"lastChange\":\"2026-05-10T22:51:19.339Z\",\"now\":\"2026-05-10T22:51:35.2411228Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "4723afdd-4792-4054-8b99-1e7e5d717dbe",
+          "tsOpen": "2026-05-10T22:51:50.239614Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "B",
+          "spotId": "B-02",
+          "evidenceJson": "{\"lastChange\":\"2026-05-10T22:51:27.345Z\",\"now\":\"2026-05-10T22:51:50.2396148Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "3bab8564-b38d-4db8-8ef7-c1c14df6c058",
+          "tsOpen": "2026-05-10T22:52:20.235096Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "B",
+          "spotId": "B-20",
+          "evidenceJson": "{\"lastChange\":\"2026-05-10T22:52:04.38Z\",\"now\":\"2026-05-10T22:52:20.2350961Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "ed481b30-3270-405a-877f-1a22877b7d43",
+          "tsOpen": "2026-05-10T22:52:20.235096Z",
+          "tsClose": null,
+          "type": "STUCK_FREE",
+          "severity": 3,
+          "sectorId": "C",
+          "spotId": "C-16",
+          "evidenceJson": "{\"lastChange\":\"2026-05-10T22:52:05.381Z\",\"now\":\"2026-05-10T22:52:20.2350961Z\"}",
+          "status": "open"
+        },
+        {
+          "id": "c9fef120-49c1-4c12-8bc2-131195218af1",
+          "tsOpen": "2026-05-10T22:52:35.236544Z",
+          "tsClose": null,
+          "type": "STUCK_OCCUPIED",
+          "severity": 3,
+          "sectorId": "A",
+          "spotId": "A-12",
+          "evidenceJson": "{\"lastChange\":\"2026-05-10T22:52:17.392Z\",\"now\":\"2026-05-10T22:52:35.2365446Z\"}",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "name": "idempotency",
+      "data": {
+        "after": [
+          {
+            "sectorId": "A",
+            "occupiedCount": 28,
+            "freeCount": 2,
+            "occupancyRate": 0.9333333333333333,
+            "lastUpdateTs": "2026-05-10T22:53:10.561032Z"
+          },
+          {
+            "sectorId": "C",
+            "occupiedCount": 0,
+            "freeCount": 30,
+            "occupancyRate": 0,
+            "lastUpdateTs": "2026-05-10T22:52:05.381Z"
+          },
+          {
+            "sectorId": "B",
+            "occupiedCount": 5,
+            "freeCount": 25,
+            "occupancyRate": 0.16666666666666666,
+            "lastUpdateTs": "2026-05-10T22:53:17.446Z"
+          }
+        ],
+        "before": [
+          {
+            "sectorId": "A",
+            "occupiedCount": 28,
+            "freeCount": 2,
+            "occupancyRate": 0.9333333333333333,
+            "lastUpdateTs": "2026-05-10T22:53:10.561032Z"
+          },
+          {
+            "sectorId": "C",
+            "occupiedCount": 0,
+            "freeCount": 30,
+            "occupancyRate": 0,
+            "lastUpdateTs": "2026-05-10T22:52:05.381Z"
+          },
+          {
+            "sectorId": "B",
+            "occupiedCount": 5,
+            "freeCount": 25,
+            "occupancyRate": 0.16666666666666666,
+            "lastUpdateTs": "2026-05-10T22:53:17.446Z"
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [],
+  "completedAt": "2026-05-10T22:53:22.7770723Z"
+}

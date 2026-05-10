@@ -3,11 +3,11 @@ param(
     [int]$MqttPort = 1883,
     [string]$ApiUrl = "http://localhost:5000",
     [string]$SimulatorUrl = "http://localhost:3000",
-    [int]$TimeWaitSec = 3,
+    [int]$TimeWaitSec = 10,
     [string]$Sector = "A",
     [string]$OutputFile = (Join-Path $PSScriptRoot "e2e-demo-output.json"),
     [int]$MaxFillAttempts = 10,
-    [int]$PublishDurationSec = 10
+    [int]$PublishDurationSec = 15
 )
 
 function Require-Command {
@@ -42,13 +42,15 @@ $result = [ordered]@{
 function Publish-OccupiedBurst {
     param(
         [string]$SectorId,
-        [int]$SpotCount,
+        [int]$StartIndex,
+        [int]$EndIndex,
         [int]$DurationSec
     )
 
-    $sleepMs = [int](($DurationSec * 1000) / [Math]::Max($SpotCount, 1))
+    $spotCount = [Math]::Max(($EndIndex - $StartIndex + 1), 0)
+    $sleepMs = [int](($DurationSec * 1000) / [Math]::Max($spotCount, 1))
     $firstId = $null
-    for ($i = 1; $i -le $SpotCount; $i++) {
+    for ($i = $StartIndex; $i -le $EndIndex; $i++) {
         $idx = $i.ToString("00")
         $spot = "$SectorId-$idx"
         $eventId = "e2e-$spot-$(Get-Date -Format yyyyMMddHHmmss)-$i"
@@ -75,9 +77,10 @@ function Publish-OccupiedBurst {
 }
 
 # Publish occupancy events to reach >=90% for sector A
-$target = 28
+$startIndex = 2
+$endIndex = 29
 Write-Host "Publishing OCCUPIED events to sector $Sector..."
-$firstEventId = Publish-OccupiedBurst -SectorId $Sector -SpotCount $target -DurationSec $PublishDurationSec
+$firstEventId = Publish-OccupiedBurst -SectorId $Sector -StartIndex $startIndex -EndIndex $endIndex -DurationSec $PublishDurationSec
 
 Write-Host "Waiting $TimeWaitSec seconds for backend to ingest events..."
 Start-Sleep -Seconds $TimeWaitSec
@@ -90,7 +93,7 @@ $occRate = ($sectorsSummary | Where-Object { $_.sectorId -eq $Sector }).occupanc
 $attemptsUsed = 0
 while ($attemptsUsed -lt $MaxFillAttempts -and $occRate -lt 0.9) {
     $attemptsUsed++
-    Publish-OccupiedBurst -SectorId $Sector -SpotCount $target -DurationSec $PublishDurationSec | Out-Null
+    Publish-OccupiedBurst -SectorId $Sector -StartIndex $startIndex -EndIndex $endIndex -DurationSec $PublishDurationSec | Out-Null
     Start-Sleep -Seconds $pollDelaySec
     $sectorsSummary = Invoke-RestMethod -Uri "$ApiUrl/api/v1/sectors"
     $occRate = ($sectorsSummary | Where-Object { $_.sectorId -eq $Sector }).occupancyRate

@@ -3,7 +3,7 @@
 MVP de estacionamento inteligente para um campus com 3 setores (A, B, C), cada um com 30 vagas. O sistema usa MQTT para eventos em tempo real, HTTP (REST) para consultas e relatórios, e Postgres para persistencia historica.
 
 Resumo rapido
-- Servicos: Mosquitto (MQTT), Backend (.NET HTTP + ingest), Bridge (MQTT -> HTTP), Simulador (Node.js), Postgres.
+- Servicos: Mosquitto (MQTT), Backend (.NET HTTP + ingest + MQTT), Simulador (Node.js), Postgres.
 - Topicos MQTT principais:
   - Eventos de vaga: campus/parking/sectors/<sectorId>/spots/<spotId>/events
   - Gateway status: campus/parking/sectors/<sectorId>/gateway/status
@@ -23,7 +23,7 @@ Quickstart (Docker)
 - mosquitto: porta 1883
 - backend: porta 5000 (HTTP)
 - simulator: porta 3000 (HTTP de controle)
-- bridge: conecta ao broker e encaminha eventos para o backend
+- backend: conecta ao broker e ingere eventos diretamente no banco
 - postgres: porta 5432
 
 Rodando local (sem Docker)
@@ -35,14 +35,6 @@ Rodando local (sem Docker)
   dotnet restore
   setx ConnectionStrings__Default "Host=localhost;Database=parking;Username=parking_user;Password=parking_pass"
   dotnet run
-
-- Bridge:
-  cd bridge
-  npm install
-  setx MQTT_HOST localhost
-  setx MQTT_PORT 1883
-  setx BACKEND_URL http://localhost:5000
-  npm start
 
 - Simulador:
   cd simulator
@@ -118,7 +110,7 @@ Exemplo MQTT (publicar evento manual)
 mosquitto_pub -h localhost -p 1883 -t "campus/parking/sectors/A/spots/A-07/events" -m '{"eventId":"uuid-1","ts":"2026-04-29T10:15:30.000Z","sectorId":"A","spotId":"A-07","state":"OCCUPIED","source":"sensor"}' -q 1
 
 Checklist de demonstracao
-1. Subir Mosquitto + Postgres + backend + bridge + simulator (docker-compose ou local).
+1. Subir Mosquitto + Postgres + backend + simulator (docker-compose ou local).
 2. Rodar mosquitto_sub -t "campus/parking/#" -v para observar eventos.
 3. Ver /api/v1/map e /api/v1/sectors atualizando em tempo real.
 4. Injetar falha:
@@ -129,8 +121,22 @@ Checklist de demonstracao
 6. Testar idempotencia: republicar o mesmo eventId e verificar que spot_events nao duplica.
 
 Script de demo automatizada
-- scripts/e2e-demo.sh publica eventos MQTT e consulta a API.
-- Padrao usa API http://localhost:5000. Ajuste via API_URL se necessario.
+- Linux/macOS (bash):
+  - chmod +x scripts/e2e-demo.sh
+  - ./scripts/e2e-demo.sh
+  - Env vars:
+    - MQTT_HOST (padrao localhost)
+    - MQTT_PORT (padrao 1883)
+    - API_URL (padrao http://localhost:5000)
+    - TIME_WAIT (segundos para ingestao, padrao 3)
+- Windows (PowerShell):
+  - ./scripts/e2e-demo.ps1 -MqttHost localhost -MqttPort 1883 -ApiUrl http://localhost:5000 -SimulatorUrl http://localhost:3000
+  - Parametros uteis:
+    - -TimeWaitSec 3
+    - -Sector A
+    - -PublishDurationSec 10
+    - -MaxFillAttempts 10
+  - Saida: scripts/e2e-demo-output.json
 
 Verificando o banco (Postgres)
 - Conectar e consultar:
@@ -141,8 +147,8 @@ Verificando o banco (Postgres)
 
 Logs e troubleshooting
 - Se eventos nao aparecem no backend:
-  - Verifique o bridge conectando ao broker e ao backend.
-  - Verifique subscription do bridge: campus/parking/#.
+  - Verifique o backend conectando ao broker (MQTT_HOST/MQTT_PORT).
+  - Verifique subscription do backend: campus/parking/#.
   - Confira ConnectionStrings__Default e o status do Postgres.
 
 Configuracao recomendada para demo

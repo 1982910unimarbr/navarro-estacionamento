@@ -15,6 +15,8 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 // use minimal built-in OpenAPI helper
 builder.Services.AddOpenApi();
 builder.Services.AddHostedService<IncidentMonitor>();
+builder.Services.AddHostedService<MqttIngestService>();
+builder.Services.AddScoped<IParkingIngestService, ParkingIngestService>();
 
 var conn = builder.Configuration.GetConnectionString("Default") ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default") ?? "Host=postgres;Database=parking;Username=parking_user;Password=parking_pass";
 

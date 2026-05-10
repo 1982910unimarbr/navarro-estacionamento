@@ -8,12 +8,14 @@ set -euo pipefail
 #   MQTT_HOST (default localhost)
 #   MQTT_PORT (default 1883)
 #   API_URL (default http://localhost:3000)
-#   TIME_WAIT (seconds to wait for backend ingestion, default 3)
+#   TIME_WAIT (seconds to wait for backend ingestion, default 10)
+#   PUBLISH_DURATION (seconds to spread the publish burst, default 15)
 
 MQTT_HOST="${MQTT_HOST:-localhost}"
 MQTT_PORT="${MQTT_PORT:-1883}"
 API_URL="${API_URL:-http://localhost:5000}"
-TIME_WAIT="${TIME_WAIT:-3}"
+TIME_WAIT="${TIME_WAIT:-10}"
+PUBLISH_DURATION="${PUBLISH_DURATION:-15}"
 SECTOR="A"
 
 command -v mosquitto_pub >/dev/null 2>&1 || { echo "mosquitto_pub not found in PATH"; exit 1; }
@@ -22,11 +24,14 @@ command -v jq >/dev/null 2>&1 || echo "jq not found, output will be raw JSON"
 
 echo "Starting e2e demo against MQTT ${MQTT_HOST}:${MQTT_PORT} and API ${API_URL}"
 
-# Publish occupancy events to reach >=90% for sector A (27 of 30)
-TARGET=27
-echo "Publishing $TARGET OCCUPIED events to sector $SECTOR..."
+# Publish occupancy events to reach >=90% for sector A
+START_INDEX=2
+END_INDEX=29
+SPOT_COUNT=$((END_INDEX - START_INDEX + 1))
+SLEEP_MS=$((PUBLISH_DURATION * 1000 / (SPOT_COUNT > 0 ? SPOT_COUNT : 1)))
+echo "Publishing $SPOT_COUNT OCCUPIED events to sector $SECTOR..."
 PUBLISHED_FIRST_EVENT_ID=""
-for i in $(seq 1 $TARGET); do
+for i in $(seq $START_INDEX $END_INDEX); do
   idx=$(printf "%02d" "$i")
   SPOT="${SECTOR}-${idx}"
   EVENT_ID="e2e-${SPOT}-$(date +%s)-${i}"
@@ -34,6 +39,9 @@ for i in $(seq 1 $TARGET); do
   PAYLOAD=$(printf '{"eventId":"%s","ts":"%s","sectorId":"%s","spotId":"%s","state":"OCCUPIED","source":"test"}' "$EVENT_ID" "$TS" "$SECTOR" "$SPOT")
   mosquitto_pub -h "$MQTT_HOST" -p "$MQTT_PORT" -t "campus/parking/sectors/$SECTOR/spots/$SPOT/events" -m "$PAYLOAD" -q 1
   if [ -z "$PUBLISHED_FIRST_EVENT_ID" ]; then PUBLISHED_FIRST_EVENT_ID="$EVENT_ID"; fi
+  if [ "$SLEEP_MS" -gt 0 ]; then
+    sleep "$(awk "BEGIN { printf \"%.3f\", $SLEEP_MS/1000 }")"
+  fi
 done
 
 echo "Waiting $TIME_WAIT seconds for backend to ingest events..."
