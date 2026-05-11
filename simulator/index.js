@@ -11,12 +11,17 @@ const { Mutex } = require('async-mutex');
 const MQTT_HOST = process.env.MQTT_HOST || 'localhost';
 const MQTT_PORT = process.env.MQTT_PORT || 1883;
 const SIM_TIME_RATIO = parseInt(process.env.SIM_TIME_RATIO || '60', 10); // seconds per real second
+const SIM_TICK_MS = parseInt(process.env.SIM_TICK_MS || '10000', 10);
+const OCCUPIED_HOLD_SEC = parseInt(process.env.OCCUPIED_HOLD_SEC || '10', 10);
+const OCCUPIED_HOLD_MS = Math.max(OCCUPIED_HOLD_SEC, 0) * 1000;
+const ARRIVAL_RATE_PER_MIN = parseFloat(process.env.ARRIVAL_RATE_PER_MIN || '30');
+const DEPARTURE_RATE_PER_MIN = parseFloat(process.env.DEPARTURE_RATE_PER_MIN || '30');
 
 const client = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`);
 
 // Spots state
 const sectors = ['A','B','C'];
-const spots = {}; // key -> {sector, id, state, lastChange, stuckMode, flapping}
+const spots = {}; // key -> {sector, id, state, lastChange, stuckMode, flapping, occupiedUntil}
 const mutex = new Mutex();
 
 for(const s of sectors){
@@ -28,7 +33,8 @@ for(const s of sectors){
       state: 'FREE',
       lastChange: Date.now(),
       stuckMode: null, // 'stuck_occupied'|'stuck_free'
-      flapping: false
+      flapping: false,
+      occupiedUntil: null
     };
   }
 }
@@ -46,19 +52,45 @@ function publishSpotEvent(spot, state, source='sensor'){
   client.publish(topic, JSON.stringify(payload), {qos:0});
 }
 
+function expectedCount(ratePerMin){
+  const perTick = ratePerMin * (SIM_TICK_MS / 60000);
+  const base = Math.floor(perTick);
+  return base + (Math.random() < (perTick - base) ? 1 : 0);
+}
+
+function takeRandom(count, items){
+  const copy = items.slice();
+  const picked = [];
+  const limit = Math.min(count, copy.length);
+  for(let i = 0; i < limit; i++){
+    const idx = Math.floor(Math.random() * copy.length);
+    picked.push(copy.splice(idx, 1)[0]);
+  }
+  return picked;
+}
+
 // Simulation loop: each real second simulates SIM_TIME_RATIO seconds
 setInterval(async ()=>{
   const release = await mutex.acquire();
   try{
     const now = Date.now();
-    // iterate spots and randomly change states with realistic patterns
+    // iterate spots and apply entry/exit simulation
     for(const id of Object.keys(spots)){
       const spot = spots[id];
+      if(spot.state === 'OCCUPIED' && spot.occupiedUntil && now >= spot.occupiedUntil){
+        spot.state = 'FREE';
+        spot.lastChange = now;
+        spot.occupiedUntil = null;
+        spot.stuckMode = null;
+        publishSpotEvent(spot, 'FREE');
+        continue;
+      }
       // if stuck mode, maybe still occasionally publish (for stuck detection)
       if(spot.stuckMode === 'stuck_occupied'){
         if(spot.state !== 'OCCUPIED'){
           spot.state = 'OCCUPIED';
           spot.lastChange = now;
+          spot.occupiedUntil = now + OCCUPIED_HOLD_MS;
           publishSpotEvent(spot, 'OCCUPIED');
         }
         continue;
@@ -67,38 +99,37 @@ setInterval(async ()=>{
         if(spot.state !== 'FREE'){
           spot.state = 'FREE';
           spot.lastChange = now;
+          spot.occupiedUntil = null;
           publishSpotEvent(spot, 'FREE');
         }
         continue;
       }
-
-      // Basic probabilistic model: base chance to change state depends on time of day (simulated)
-      const hour = (Math.floor((now/1000)*SIM_TIME_RATIO/3600) % 24);
-      // peak morning 8-10 and afternoon 17-19
-      let pChange = 0.001; // per tick
-      if((hour>=7 && hour<=10) || (hour>=16 && hour<=19)) pChange = 0.02;
-      // small random chance
-      if(Math.random() < pChange){
-        const newState = spot.state === 'FREE' ? 'OCCUPIED' : 'FREE';
-        // flapping injection
-        if(spot.flapping && Math.random()<0.5){
-          // flip twice quickly
-          spot.state = newState;
-          spot.lastChange = now;
-          publishSpotEvent(spot, newState);
-          // immediate opposite
-          spot.state = (newState==='FREE'?'OCCUPIED':'FREE');
-          spot.lastChange = now+100;
-          publishSpotEvent(spot, spot.state);
-        } else {
-          spot.state = newState;
-          spot.lastChange = now;
-          publishSpotEvent(spot, newState);
-        }
+      if(spot.state === 'OCCUPIED' && spot.occupiedUntil && now < spot.occupiedUntil){
+        continue;
       }
     }
+
+    const freeSpots = Object.values(spots).filter(s => s.state === 'FREE');
+    const occupiedSpots = Object.values(spots).filter(s => s.state === 'OCCUPIED' && (!s.occupiedUntil || now >= s.occupiedUntil));
+
+    const arrivals = takeRandom(expectedCount(ARRIVAL_RATE_PER_MIN), freeSpots);
+    const departures = takeRandom(expectedCount(DEPARTURE_RATE_PER_MIN), occupiedSpots);
+
+    for(const spot of arrivals){
+      spot.state = 'OCCUPIED';
+      spot.lastChange = now;
+      spot.occupiedUntil = now + OCCUPIED_HOLD_MS;
+      publishSpotEvent(spot, 'OCCUPIED');
+    }
+
+    for(const spot of departures){
+      spot.state = 'FREE';
+      spot.lastChange = now;
+      spot.occupiedUntil = null;
+      publishSpotEvent(spot, 'FREE');
+    }
   }finally{release();}
-}, 1000);
+}, SIM_TICK_MS);
 
 // Periodically publish gateway status
 setInterval(()=>{
@@ -124,6 +155,7 @@ async function applyFaultMode(spotId, mode, res){
     if(mode === 'clear'){
       spots[spotId].stuckMode = null;
       spots[spotId].flapping = false;
+      spots[spotId].occupiedUntil = null;
       return res.json({ok:true});
     }
     if(mode === 'stuck_occupied' || mode === 'stuck_free'){

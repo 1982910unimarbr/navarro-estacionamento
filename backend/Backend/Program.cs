@@ -4,6 +4,7 @@ using Backend.Services;
 using System.Text.Json;
 using System;
 using Scalar.AspNetCore;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,25 @@ builder.Services.AddOpenApi();
 builder.Services.AddHostedService<IncidentMonitor>();
 builder.Services.AddHostedService<MqttIngestService>();
 builder.Services.AddScoped<IParkingIngestService, ParkingIngestService>();
+builder.Services.AddQuartz(q =>
+{
+    q.UseMicrosoftDependencyInjectionJobFactory();
+
+    var jobKey = new Quartz.JobKey("SectorSnapshotJob");
+    q.AddJob<SectorSnapshotJob>(opts => opts.WithIdentity(jobKey));
+    q.AddTrigger(opts => opts
+        .ForJob(jobKey)
+        .WithIdentity("SectorSnapshotTrigger")
+        .WithSimpleSchedule(x => x.WithIntervalInSeconds(3).RepeatForever()));
+
+    var autoFreeKey = new Quartz.JobKey("SpotAutoFreeJob");
+    q.AddJob<SpotAutoFreeJob>(opts => opts.WithIdentity(autoFreeKey));
+    q.AddTrigger(opts => opts
+        .ForJob(autoFreeKey)
+        .WithIdentity("SpotAutoFreeTrigger")
+        .WithSimpleSchedule(x => x.WithIntervalInSeconds(3).RepeatForever()));
+});
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
 var conn = builder.Configuration.GetConnectionString("Default") ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default") ?? "Host=postgres;Database=parking;Username=parking_user;Password=parking_pass";
 

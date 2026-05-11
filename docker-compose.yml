@@ -33,6 +33,7 @@ services:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
       - SIM_TIME_RATIO=60 # 1s = 60 simulated seconds (configurable)
+      - OCCUPIED_HOLD_SEC=10
     depends_on:
       - mosquitto
     ports:

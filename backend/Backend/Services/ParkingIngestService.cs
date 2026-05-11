@@ -137,38 +137,6 @@ public class ParkingIngestService : IParkingIngestService
             }
         }
 
-        var minuteTs = DateTime.UtcNow;
-        minuteTs = new DateTime(minuteTs.Year, minuteTs.Month, minuteTs.Day, minuteTs.Hour, minuteTs.Minute, 0, DateTimeKind.Utc);
-        var occupiedCount = await _db.Spots
-            .Where(s => s.SectorId == request.SectorId && s.CurrentState == "OCCUPIED")
-            .CountAsync(cancellationToken);
-        var total = await _db.Spots
-            .Where(s => s.SectorId == request.SectorId)
-            .CountAsync(cancellationToken);
-        var freeCount = total - occupiedCount;
-        var occupancyRate = total > 0 ? (decimal)occupiedCount / (decimal)total : 0;
-        var existingSnapshot = await _db.SectorSnapshots
-            .Where(s => s.SectorId == request.SectorId && s.Ts == minuteTs)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (existingSnapshot == null)
-        {
-            _db.SectorSnapshots.Add(new Models.SectorSnapshot
-            {
-                Ts = minuteTs,
-                SectorId = request.SectorId,
-                OccupiedCount = occupiedCount,
-                FreeCount = freeCount,
-                OccupancyRate = occupancyRate
-            });
-        }
-        else
-        {
-            existingSnapshot.OccupiedCount = occupiedCount;
-            existingSnapshot.FreeCount = freeCount;
-            existingSnapshot.OccupancyRate = occupancyRate;
-            _db.SectorSnapshots.Update(existingSnapshot);
-        }
-
         await _db.SaveChangesAsync(cancellationToken);
     }
 
