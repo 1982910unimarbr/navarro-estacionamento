@@ -2,7 +2,7 @@ param(
     [string]$MqttHost = "localhost",
     [int]$MqttPort = 1883,
     [string]$Sector = "A",
-    [int]$PublishDelayMs = 250,
+    [int]$PublishDelayMs = 1000,
     [int]$StartIndex = 1,
     [int]$EndIndex = 28
 )
@@ -44,9 +44,12 @@ for ($i = $StartIndex; $i -le $EndIndex; $i++) {
     } | ConvertTo-Json -Compress
 
     $topic = "campus/parking/sectors/$Sector/spots/$spotId/events"
-    & node (Join-Path $PSScriptRoot "mqtt-publish.js") $topic $payload $MqttHost $MqttPort | Out-Null
-
-    Write-Host "Published event for $spotId"
+    & node (Join-Path $PSScriptRoot "mqtt-publish.js") $topic $payload $MqttHost $MqttPort
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Publish failed for $spotId"
+    } else {
+        Write-Host "Publish ok for $spotId"
+    }
 
     if ($PublishDelayMs -gt 0) {
         Start-Sleep -Milliseconds $PublishDelayMs

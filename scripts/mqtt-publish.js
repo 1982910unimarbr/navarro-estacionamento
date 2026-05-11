@@ -13,14 +13,16 @@ const client = mqtt.connect(`mqtt://${mqttHost}:${mqttPort}`);
 client.on('connect', () => {
   client.publish(topic, payload, { qos: 1 }, (err) => {
     if (err) {
-      console.error(err.message);
-      process.exit(1);
+      console.error(`Publish failed for ${topic}: ${err.message}`);
+      client.end(true, () => process.exit(1));
+      return;
     }
+    console.log(`Published ${topic}`);
     client.end(true, () => process.exit(0));
   });
 });
 
 client.on('error', (err) => {
-  console.error(err.message);
-  process.exit(1);
+  console.error(`MQTT connection error: ${err.message}`);
+  client.end(true, () => process.exit(1));
 });
