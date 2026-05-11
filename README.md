@@ -47,10 +47,12 @@ Rodando local (sem Docker)
 Simulador
 - Simula 90 sensores (A-01..C-30) e 3 gateways (A,B,C).
 - SIM_TIME_RATIO: segundos simulados por segundo real (ex.: 60 = 1s real = 1min simulado).
+- Observacao: atualmente o simulador nao usa SIM_TIME_RATIO para ajustar chegadas/saidas.
+- OCCUPIED_HOLD_SEC: tempo fixo de ocupacao (ainda nao ha variacao 30 min-6h em tempo simulado).
 - Modos de falha injetaveis (via HTTP do simulador):
   - stuck_occupied (travado como OCUPADO)
   - stuck_free (travado como LIVRE)
-  - flapping (troca muito rapida)
+  - flapping (flag de flapping; nao alterna automaticamente)
 - Endpoints do simulador (exemplos):
   - POST http://localhost:3000/simulator/failures { "spotId":"A-07", "mode":"stuck_occupied" }
   - POST http://localhost:3000/simulator/reset { "spotId":"A-07" }
@@ -108,6 +110,14 @@ Exemplos de uso (curl)
 
 Exemplo MQTT (publicar evento manual)
 mosquitto_pub -h localhost -p 1883 -t "campus/parking/sectors/A/spots/A-07/events" -m '{"eventId":"uuid-1","ts":"2026-04-29T10:15:30.000Z","sectorId":"A","spotId":"A-07","state":"OCCUPIED","source":"sensor"}' -q 1
+
+Estado dos requisitos (Sprint 2)
+- OK: MQTT topicos/payloads, ingestao idempotente, persistencia historica, endpoints HTTP, recomendacoes >= 0.90, incidentes STUCK/FLAPPING, snapshots setoriais.
+- Parcial (simulador):
+  - Picos de chegada (manha/fim da tarde) ainda nao simulados.
+  - Permanencia 30 min-6h em tempo simulado ainda nao implementada (tempo fixo via OCCUPIED_HOLD_SEC).
+  - SIM_TIME_RATIO ainda nao influencia o comportamento.
+  - Modo flapping marca a vaga, mas nao gera alternancias rapidas automaticamente.
 
 Checklist de demonstracao
 1. Subir Mosquitto + Postgres + backend + simulator (docker-compose ou local).
