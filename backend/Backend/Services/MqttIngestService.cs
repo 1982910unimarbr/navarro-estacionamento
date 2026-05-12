@@ -59,6 +59,7 @@ public class MqttIngestService : BackgroundService
                 await _client.ConnectAsync(options, stoppingToken);
                 await _client.SubscribeAsync("campus/parking/sectors/+/spots/+/events", MqttQualityOfServiceLevel.AtLeastOnce, stoppingToken);
                 await _client.SubscribeAsync("campus/parking/sectors/+/gateway/status", MqttQualityOfServiceLevel.AtLeastOnce, stoppingToken);
+                await _client.SubscribeAsync("campus/parking/sectors/+/incidents", MqttQualityOfServiceLevel.AtLeastOnce, stoppingToken);
 
                 await Task.WhenAny(_disconnectTcs.Task, Task.Delay(Timeout.Infinite, stoppingToken));
             }
@@ -107,6 +108,18 @@ public class MqttIngestService : BackgroundService
                     return;
                 }
                 await ingest.HandleGatewayStatusAsync(status);
+                return;
+            }
+
+            if (topic.EndsWith("/incidents", StringComparison.OrdinalIgnoreCase))
+            {
+                var incident = JsonSerializer.Deserialize<IncidentRequest>(payloadText, _jsonOptions);
+                if (incident == null)
+                {
+                    _logger.LogWarning("MQTT incident payload invalid on {Topic}", topic);
+                    return;
+                }
+                await ingest.HandleIncidentAsync(incident);
                 return;
             }
 

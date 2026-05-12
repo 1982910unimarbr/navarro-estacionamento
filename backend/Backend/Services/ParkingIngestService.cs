@@ -9,6 +9,7 @@ public interface IParkingIngestService
 {
     Task HandleEventAsync(EventRequest request, CancellationToken cancellationToken = default);
     Task HandleGatewayStatusAsync(GatewayStatusRequest request, CancellationToken cancellationToken = default);
+    Task HandleIncidentAsync(IncidentRequest request, CancellationToken cancellationToken = default);
 }
 
 public class ParkingIngestService : IParkingIngestService
@@ -161,4 +162,33 @@ public class ParkingIngestService : IParkingIngestService
         }
         await _db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task HandleIncidentAsync(IncidentRequest request, CancellationToken cancellationToken = default)
+    {
+        // Check if incident with same eventId already exists (idempotency)
+        var existingIncident = await _db.Incidents
+            .FirstOrDefaultAsync(i => i.Id.ToString() == request.EventId || (i.SpotId == request.SpotId && i.Type == request.Type && i.Status == "open"), cancellationToken);
+        
+        if (existingIncident != null)
+        {
+            return;
+        }
+
+        var severity = request.Severity ?? 1;
+        var incident = new Models.Incident
+        {
+            Id = Guid.TryParse(request.EventId, out var parsedGuid) ? parsedGuid : Guid.NewGuid(),
+            TsOpen = request.Ts,
+            Type = request.Type,
+            Severity = severity,
+            SectorId = request.SectorId,
+            SpotId = request.SpotId,
+            EvidenceJson = JsonSerializer.Serialize(new { source = request.Source, eventId = request.EventId }),
+            Status = request.Status ?? "open"
+        };
+
+        _db.Incidents.Add(incident);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
 }
+

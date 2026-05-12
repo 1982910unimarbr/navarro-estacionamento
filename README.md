@@ -140,7 +140,15 @@ Ou via PgAdmin4 (porta 8080) após o Docker estar rodando.
 - **Demo E2E (Shell):** `./scripts/e2e-demo.sh` (simula eventos e testa APIs).
 - **Demo Manual (PowerShell):** `./scripts/e2e-demo-manual.ps1` (para Windows).
 - **Ocupar Vaga via JS:** `node scripts/e2e-occupy-js.js`.
-- **Publicar MQTT:** `node scripts/mqtt-publish.js`.
+- **Publicar MQTT Genérico:** `node scripts/mqtt-publish.js <topic> <payload>`.
+- **Inserir Evento de Incidente via MQTT:** `node scripts/insert-incident-event.js <eventId> [sectorId] [spotId] [type] [mqttHost] [mqttPort]`.
+  - Tipos de incidente: `STUCK_OCCUPIED`, `STUCK_FREE`, `FLAPPING`.
+  - Exemplos:
+    ```bash
+    node scripts/insert-incident-event.js my-event-123
+    node scripts/insert-incident-event.js my-event-456 B B-15 STUCK_FREE
+    node scripts/insert-incident-event.js my-event-789 C C-30 FLAPPING localhost 1883
+    ```
 
 Para executar o demo:
 ```bash
