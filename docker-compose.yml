@@ -33,7 +33,7 @@ services:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
       - SIM_TIME_RATIO=60 # 1s = 60 simulated seconds (configurable)
-      - OCCUPIED_HOLD_SEC=10
+      - OCCUPIED_HOLD_SEC=60
     depends_on:
       - mosquitto
     ports:
@@ -42,9 +42,10 @@ services:
   backend:
     build: ./backend
     environment:
-      - ConnectionStrings__Default=Host=postgres;Database=parking;Username=parking_user;Password=parking_pass
+      - ConnectionStrings__Default=Host=postgres;Database=parking;Username=parking_user;Password=parking_pass;Include Error Detail=true
       - ASPNETCORE_URLS=http://+:80
-      - STUCK_SECONDS=10
+      - STUCK_SECONDS=30
+      - OCCUPIED_HOLD_SEC=60
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
     depends_on:

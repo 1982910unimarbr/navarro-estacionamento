@@ -20,8 +20,7 @@ namespace Backend.Data
             modelBuilder.Entity<SpotEvent>().HasKey(e => e.EventId);
             modelBuilder.Entity<SectorSnapshot>().HasKey(s => new { s.Ts, s.SectorId });
             modelBuilder.Entity<RecommendationLog>().HasKey(r => r.Id);
-            // prevent duplicate open incidents for same spot/type
-            modelBuilder.Entity<Incident>().HasIndex(i => new { i.SpotId, i.Type, i.Status }).IsUnique(true);
+            // Note: Unique constraint removed - handled via ON CONFLICT DO NOTHING in SQL
             modelBuilder.Entity<GatewayStatus>().HasKey(g => g.SectorId);
         }
     }

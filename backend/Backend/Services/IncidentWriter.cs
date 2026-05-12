@@ -8,13 +8,20 @@ namespace Backend.Services
 {
     public static class IncidentWriter
     {
-        public static Task AddIfNotExistsAsync(ParkingContext db, Incident incident, CancellationToken cancellationToken = default)
+        public static async Task AddIfNotExistsAsync(ParkingContext db, Incident incident, CancellationToken cancellationToken = default)
         {
-            return db.Database.ExecuteSqlInterpolatedAsync($@"
-                INSERT INTO ""Incidents"" (""Id"", ""TsOpen"", ""TsClose"", ""Type"", ""Severity"", ""SectorId"", ""SpotId"", ""EvidenceJson"", ""Status"")
-                VALUES ({incident.Id}, {incident.TsOpen}, {incident.TsClose}, {incident.Type}, {incident.Severity}, {incident.SectorId}, {incident.SpotId}, {incident.EvidenceJson}, {incident.Status})
-                ON CONFLICT (""SpotId"", ""Type"", ""Status"") DO NOTHING;
-            ", cancellationToken);
+            // Check if incident already exists with same SpotId, Type, Status
+            var exists = await db.Incidents.AnyAsync(i =>
+                i.SpotId == incident.SpotId &&
+                i.Type == incident.Type &&
+                i.Status == incident.Status,
+                cancellationToken);
+
+            if (!exists)
+            {
+                db.Incidents.Add(incident);
+                await db.SaveChangesAsync(cancellationToken);
+            }
         }
     }
 }

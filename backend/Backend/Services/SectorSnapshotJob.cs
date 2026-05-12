@@ -39,40 +39,34 @@ public class SectorSnapshotJob : IJob
 
         foreach (var sectorId in sectorIds)
         {
-            var occupiedCount = await db.Spots
-                .Where(s => s.SectorId == sectorId && s.CurrentState == "OCCUPIED")
-                .CountAsync(context.CancellationToken);
-            var total = await db.Spots
-                .Where(s => s.SectorId == sectorId)
-                .CountAsync(context.CancellationToken);
-            var freeCount = total - occupiedCount;
-            var occupancyRate = total > 0 ? (decimal)occupiedCount / (decimal)total : 0;
-
-            var existingSnapshot = await db.SectorSnapshots
-                .Where(s => s.SectorId == sectorId && s.Ts == bucketTs)
-                .FirstOrDefaultAsync(context.CancellationToken);
-
-            if (existingSnapshot == null)
+            try
             {
-                db.SectorSnapshots.Add(new Models.SectorSnapshot
-                {
-                    Ts = bucketTs,
-                    SectorId = sectorId,
-                    OccupiedCount = occupiedCount,
-                    FreeCount = freeCount,
-                    OccupancyRate = occupancyRate
-                });
+                var occupiedCount = await db.Spots
+                    .Where(s => s.SectorId == sectorId && s.CurrentState == "OCCUPIED")
+                    .CountAsync(context.CancellationToken);
+                var total = await db.Spots
+                    .Where(s => s.SectorId == sectorId)
+                    .CountAsync(context.CancellationToken);
+                var freeCount = total - occupiedCount;
+                var occupancyRate = total > 0 ? (decimal)occupiedCount / (decimal)total : 0;
+
+                // Use upsert SQL to avoid race conditions
+                await db.Database.ExecuteSqlInterpolatedAsync($@"
+                    INSERT INTO ""SectorSnapshots"" (""Ts"", ""SectorId"", ""OccupiedCount"", ""FreeCount"", ""OccupancyRate"")
+                    VALUES ({bucketTs}, {sectorId}, {occupiedCount}, {freeCount}, {occupancyRate})
+                    ON CONFLICT (""Ts"", ""SectorId"") DO UPDATE SET
+                        ""OccupiedCount"" = EXCLUDED.""OccupiedCount"",
+                        ""FreeCount"" = EXCLUDED.""FreeCount"",
+                        ""OccupancyRate"" = EXCLUDED.""OccupancyRate""
+                ", context.CancellationToken);
             }
-            else
+            catch (Exception ex)
             {
-                existingSnapshot.OccupiedCount = occupiedCount;
-                existingSnapshot.FreeCount = freeCount;
-                existingSnapshot.OccupancyRate = occupancyRate;
-                db.SectorSnapshots.Update(existingSnapshot);
+                _logger.LogWarning("Failed to update snapshot for sector {SectorId}: {Message}", sectorId, ex.Message);
+                // Continue to next sector even if this one fails
             }
         }
 
-        await db.SaveChangesAsync(context.CancellationToken);
         _logger.LogDebug("Sector snapshots updated at {BucketTs}", bucketTs);
     }
 }
